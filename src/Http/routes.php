@@ -36,6 +36,7 @@ Route::get('cart/detailsin', [
 'uses' => 'Sitedigitalweb\Carrito\Http\CartController@orderDetail'
 ]);
 
+Route::get('sd/productos-online', 'Sitedigitalweb\Carrito\Http\CategoryController@productos_online')->middleware('web');
 
 
 
@@ -61,13 +62,13 @@ Route::get('product/detail/{slug}', [
 'uses' => 'DigitalsiteSaaS\Carrito\Http\StoreController@show'
 ]);
 
-Route::get('cart/show', [
+Route::get('cart/shows', [
 'middleware' => 'web',
 'as' => 'cart-show',
 'uses' => 'Sitedigitalweb\Carrito\Http\CartController@show'
 ]);
 
-Route::get('cart/add/{id}', [
+Route::get('cart/adds/{id}', [
 'middleware' => 'web',
 'as' => 'cart-add',
 'uses' => 'Sitedigitalweb\Carrito\Http\CartController@add'
@@ -135,6 +136,10 @@ Route::get('/sd/crear-subcategoria/{id}', function(){
 Route::post('sd/createcategoria', 'Sitedigitalweb\Carrito\Http\CategoryController@createcategoria');
 Route::get('sd/productos/{id}', 'Sitedigitalweb\Carrito\Http\ProductoController@digitales');
 Route::get('sd/crear-producto/{id}', 'Sitedigitalweb\Carrito\Http\ProductoController@crear');
+Route::get('sd/ordenes', 'Sitedigitalweb\Carrito\Http\CategoryController@ordenes');
+Route::get('sd/detalle-orden/{id}', 'Sitedigitalweb\Carrito\Http\CategoryController@detalle_orden');
+
+
 Route::get('gestion/productos/crearproducto', 'Sitedigitalweb\Carrito\Http\ProductoController@show');
 
 Route::get('gestion/carrito/autores', 'DigitalsiteSaaS\Carrito\Http\CategoryController@webautores');
@@ -175,7 +180,7 @@ Route::post('gestion/carrito/actualizarparametro/{id}', 'DigitalsiteSaaS\Carrito
 Route::get('gestion/carrito/eliminar/{id}', 'DigitalsiteSaaS\Carrito\Http\CategoryController@eliminar');
 Route::get('gestion/carrito/eliminarproducto/{id}', 'DigitalsiteSaaS\Carrito\Http\CategoryController@eliminarproducto');
 Route::get('gestion/carrito/epayco', 'DigitalsiteSaaS\Carrito\Http\CategoryController@epayco');
-Route::get('gestion/carrito/detalle/{id}', 'DigitalsiteSaaS\Carrito\Http\CategoryController@detalle');
+
 Route::get('gestion/carrito/crear-autor', 'DigitalsiteSaaS\Carrito\Http\CategoryController@createautor');
 Route::post('gestion/carrito/actuterminos', 'DigitalsiteSaaS\Carrito\Http\CategoryController@update');
 Route::get('gestion/carrito/dashboard', 'DigitalsiteSaaS\Carrito\Http\CategoryController@dashboard');
@@ -308,10 +313,73 @@ Route::get('carrito/municipios/importExport', 'DigitalsiteSaaS\Carrito\Http\Cart
 Route::get('carrito/municipios/downloadExcel/{type}', 'DigitalsiteSaaS\Carrito\Http\CartController@downloadExcelmun');
 Route::post('carrito/municipios/importExcel', 'DigitalsiteSaaS\Carrito\Http\CartController@importExcelmun');
 
-
-
-
-
 Route::get('gestion/usuarios/registrar', 'DigitalsiteSaaS\Carrito\Http\CartController@registrar');
+
+
+
+
+
+// Todas las rutas del package deben usar el middleware 'web' para que la sesión funcione
+Route::middleware('web')->group(function () {
+
+    // ==================== RUTAS DEL CARRITO ====================
+    Route::prefix('cart')->group(function () {
+        // Mostrar carrito
+        Route::get('/show', [Sitedigitalweb\Carrito\Http\CartController::class, 'show'])->name('cart-show');
+        
+        // Rutas AJAX para actualización automática
+        Route::get('/update-ajax/{slug}/{quantity}', [Sitedigitalweb\Carrito\Http\CartController::class, 'updateAjax']);
+        Route::get('/delete-ajax/{slug}', [Sitedigitalweb\Carrito\Http\CartController::class, 'deleteAjax']);
+        Route::get('/trash-ajax', [Sitedigitalweb\Carrito\Http\CartController::class, 'trashAjax']);
+        
+        // Rutas tradicionales (fallback)
+        Route::get('/add/{slug}', [Sitedigitalweb\Carrito\Http\CartController::class, 'add'])->name('cart-add');
+        Route::get('/update/{slug}/{quantity}', [Sitedigitalweb\Carrito\Http\CartController::class, 'update'])->name('cart-update');
+        Route::get('/delete/{slug}', [Sitedigitalweb\Carrito\Http\CartController::class, 'delete'])->name('cart-delete');
+        Route::get('/trash', [Sitedigitalweb\Carrito\Http\CartController::class, 'trash'])->name('cart-trash');
+    });
+
+    // ==================== RUTAS PARA ENVÍO Y CUPONES ====================
+    Route::get('/get-municipios/{departamento_id}', [Sitedigitalweb\Carrito\Http\CartController::class, 'getMunicipios'])->name('get-municipios');
+    Route::post('/calcular-envio', [Sitedigitalweb\Carrito\Http\CartController::class, 'calcularEnvio'])->name('calcular-envio');
+    Route::post('/validar-cupon-ajax', [Sitedigitalweb\Carrito\Http\CartController::class, 'validarCupon'])->name('validar-cupon-ajax');
+
+    // ==================== RUTAS DE CHECKOUT ====================
+    Route::get('/checkout', [Sitedigitalweb\Carrito\Http\CheckoutController::class, 'index'])->name('checkout');
+    Route::post('/checkout/save-step1', [Sitedigitalweb\Carrito\Http\CheckoutController::class, 'saveStep1']);
+    Route::post('/checkout/save-step2', [Sitedigitalweb\Carrito\Http\CheckoutController::class, 'saveStep2']);
+    Route::post('/checkout/create-order', [Sitedigitalweb\Carrito\Http\CheckoutController::class, 'createOrder']);
+
+    // ==================== RUTAS DE EPayco (callbacks) ====================
+    Route::any('/epayco/response', [Sitedigitalweb\Carrito\Http\CheckoutController::class, 'epaycoResponse'])->name('epayco.response');
+    Route::any('/epayco/confirmation', [Sitedigitalweb\Carrito\Http\CheckoutController::class, 'epaycoConfirmation'])->name('epayco.confirmation');
+
+    // ==================== RUTAS DE ÓRDENES ====================
+    Route::get('/order', [Sitedigitalweb\Carrito\Http\OrderController::class, 'showOrder'])->name('order.show');
+
+    // ==================== RUTA DE PRUEBA (webhook) ====================
+    Route::get('/sd/test-webhook', function() {
+        $data = [
+            'x_cust_id_cliente' => '1578383',
+            'x_ref_payco' => '351864324',
+            'x_id_factura' => 'DNdXFR4DMJJWuyAYF',
+            'x_amount' => '174700',
+            'x_tax' => '24700',
+            'x_amount_base' => '130000',
+            'x_currency_code' => 'COP',
+            'x_transaction_state' => 'Aceptada',
+            'x_extra1' => '16',
+            'x_signature' => '9fd088a3bb23b6d57cebb7d53808704be7b4ce5975cedd4a2437fc3fd3846702'
+        ];
+        
+        $request = new \Illuminate\Http\Request($data);
+        $controller = new App\Http\Controllers\CheckoutController();
+        return $controller->epaycoConfirmation($request);
+    });
+
+}); // Cierre del middleware web
+
+
+
 
 

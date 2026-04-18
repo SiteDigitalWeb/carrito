@@ -7,18 +7,20 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests;
 use DigitalsiteSaaS\Carrito\Category;
 use DigitalsiteSaaS\Carrito\Categoria;
-use DigitalsiteSaaS\Carrito\Order;
+use Sitedigitalweb\Carrito\Cms_order;
 use DigitalsiteSaaS\Carrito\Autor;
 use DigitalsiteSaaS\Carrito\Parametro;
 use DigitalsiteSaaS\Carrito\Cupon;
 use DigitalsiteSaaS\Carrito\Product;
 use DigitalsiteSaaS\Carrito\OrderItem;
 use DigitalsiteSaaS\Carrito\Configuracion;
+use App\Models\CmsConfiguracionOnline;
 use Input;
 use DigitalsiteSaaS\Usuario\Usuario;
 use DigitalsiteSaaS\Pagina\Template;
 use DB;
 use Auth;
+use App\Models\CmsOrderItem;
 use Hyn\Tenancy\Models\Hostname;
 use Hyn\Tenancy\Models\Website;
 use Hyn\Tenancy\Repositories\HostnameRepository;
@@ -147,6 +149,20 @@ private function getCategoriaModel()
         $plantilla = \DigitalsiteSaaS\Pagina\Tenant\Template::all(); 
        } 
         return view('carrito::terminos')->with('plantilla', $plantilla)->with('status', 'ok_update');
+    }
+
+
+     public function productos_online(){
+        if(!$this->tenantName){
+        $productos = Cms_producto::all();
+       }else{
+        $productos = \Sitedigitalweb\Carrito\Tenant\Cms_producto::all(); 
+       } 
+
+        return response()->json([
+    'status' => 'ok',
+    'data' => $productos
+]);
     }
 
 
@@ -444,12 +460,13 @@ public function crearcategoria()
     }
 
 
-     public function epayco(){
+     public function ordenes(){
      if(!$this->tenantName){
-     $ordenes = Order::OrderBy('id', 'desc')->get();
+     $ordenes = Cms_order::OrderBy('id', 'desc')->get();
      }else{
-     $ordenes = \DigitalsiteSaaS\Carrito\Tenant\Order::OrderBy('id', 'desc')->get();  
+     $ordenes = \Sitedigitalweb\Carrito\Tenant\Cms_order::OrderBy('id', 'desc')->get();  
      }
+  
      return view('carrito::admin.epayco', compact('ordenes'));
     }
 
@@ -460,38 +477,53 @@ public function crearcategoria()
 
 
 
-     public function detalle($id){
-    if(!$this->tenantName){
-    $productos = OrderItem::join('products','products.id','=','order_items.product_id')
-    ->join('orders','orders.id','=','order_items.order_id')
-    ->where('order_id', '=', $id)->get();
-    $users = Order::where('id',  $id)->get();          
-    $informacion = Order::leftJoin('municipios', 'municipios.id', '=', 'orders.ciudad')
-    ->leftJoin('departamentos', 'departamentos.id', '=', 'orders.departamento')
-    ->where('orders.id', '=', $id)->get();
-
-    $totales = Order::where('id', '=', $id)->get();
-    $informacionorder = Order::where('id', '=', $id)->get();
-    $datos = Order::where('id', '=', $id)->get();
-    $configuracion = Configuracion::where('id', '=', 1)->get(); 
-    }else{
-
-    $productos = \DigitalsiteSaaS\Carrito\Tenant\OrderItem::join('products','products.id','=','order_items.product_id')
-    ->join('orders','orders.id','=','order_items.order_id')
-    ->where('order_id', '=', $id)->get();
-    $users = \DigitalsiteSaaS\Carrito\Tenant\Order::where('id',  $id)->get();      
-    $configuracion = \DigitalsiteSaaS\Carrito\Tenant\Configuracion::where('id', '=', 1)->get(); 
-    $informacion = \DigitalsiteSaaS\Carrito\Tenant\Order::leftJoin('municipios', 'municipios.id', '=', 'orders.ciudad')
-    ->leftJoin('departamentos', 'departamentos.id', '=', 'orders.departamento')
-    ->where('orders.id', '=', $id)->get();
-    $totales = \DigitalsiteSaaS\Carrito\Tenant\Order::where('id', '=', $id)->get();
-    $informacionorder = \DigitalsiteSaaS\Carrito\Tenant\Order::where('id', '=', $id)->get();
-    $datos = \DigitalsiteSaaS\Carrito\Tenant\Order::where('id', '=', $id)->get();
+     public function detalle_orden($id)
+{
+    // Modelos dinámicos según tenant
+    if (!$this->tenantName) {
+        $orderModel = Cms_order::class;
+        $orderItemModel = CmsOrderItem::class;
+        $configModel = CmsConfiguracionOnline::class;
+    } else {
+        $orderModel = \Sitedigitalweb\Carrito\Tenant\Cms_order::class;
+        $orderItemModel = \Sitedigitalweb\Carrito\Tenant\CmsOrderItem::class;
+        $configModel = \Sitedigitalweb\Carrito\Tenant\Configuracion::class;
     }
 
+    // 🔹 UNA sola consulta para la orden
+    $orden = $orderModel::where('id', $id)->first();
 
-       return view('carrito::admin.detalle', compact('productos', 'users', 'informacion', 'totales', 'informacionorder', 'datos','configuracion'));
-    }
+    // 🔹 Productos
+    $productos = $orderItemModel::join('cms_producto_online', 'cms_producto_online.id', '=', 'cms_order_items.product_id')
+        ->join('cms_orders', 'cms_orders.id', '=', 'cms_order_items.order_id')
+        ->where('cms_order_items.order_id', $id)
+        ->get();
+
+    // 🔹 Información con joins
+    $informacion = $orderModel::leftJoin('cms_municipios', 'cms_municipios.id', '=', 'cms_orders.ciudad')
+        ->leftJoin('cms_departamentos', 'cms_departamentos.id', '=', 'cms_orders.departamento')
+        ->where('cms_orders.id', $id)
+        ->first();
+
+    // 🔹 Configuración
+    $configuracion = $configModel::where('id', 1)->first();
+
+    // 🔹 Mantener compatibilidad con tu vista (IMPORTANTE)
+    $users = collect([$orden]);
+    $totales = collect([$orden]);
+    $informacionorder = collect([$orden]);
+    $datos = collect([$orden]);
+
+    return view('carrito::admin.detalle', compact(
+        'productos',
+        'users',
+        'informacion',
+        'totales',
+        'informacionorder',
+        'datos',
+        'configuracion'
+    ));
+}
 
     
     

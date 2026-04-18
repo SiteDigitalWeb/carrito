@@ -110,13 +110,13 @@
                                             <th> <span class="label label-success">Aceptada</span></th>
                                             @elseif($orden->estado == "Pendiente" OR $orden->estado == "PENDING")
                                             <th> <span class="label label-warning">Pendiente</span></th>
-                                            @elseif($orden->estado == "Rechazada" OR $orden->estado == "REJECTED")
-                                            <th> <span class="label label-danger">Rechazada</span></th>
+                                            @elseif($orden->estado == "pendiente" OR $orden->estado == "REJECTED")
+                                            <th> <span class="label label-danger">Pendiente</span></th>
                                             @endif
                                             <td>{{$orden->fecha}}</td>
                              
                                             <td class="text-center">
-                                              <a href="<?=URL::to('/gestion/carrito/detalle');?>/{{ $orden->id }}"><span  id="tip" data-toggle="tooltip" data-placement="top" title="Editar Contenido" class="btn btn-warning"><i class="fa fa-list-alt sidebar-nav-icon"></i></span></a>
+                                              <a href="<?=URL::to('/sd/detalle-orden');?>/{{ $orden->id }}"><span  id="tip" data-toggle="tooltip" data-placement="top" title="Editar Contenido" class="btn btn-warning"><i class="fa fa-list-alt sidebar-nav-icon"></i></span></a>
                                             </td>
                                         </tr>
                                       @endforeach 
